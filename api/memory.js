@@ -76,10 +76,11 @@ export default async (req, res) => {
         .map(m => `${m.role === 'assistant' ? 'Jarvis' : 'Daro'}: ${m.content}`)
         .join('\n\n');
 
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      if (messages.length >= 6) {
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      // Comprehensive session summary capturing all details
-      const sessionRes = await client.messages.create({
+        // Comprehensive session summary capturing all details
+        const sessionRes = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
         messages: [{
@@ -166,10 +167,31 @@ Be specific with names, numbers, dates. This profile should feel like you know D
       memory.lastUpdated = now;
       memory.sessionCount = memory.sessions.length;
 
-      await redis.set(MEMORY_KEY, JSON.stringify(memory));
-      console.log('[memory] Saved — total sessions:', memory.sessionCount);
+        await redis.set(MEMORY_KEY, JSON.stringify(memory));
+        console.log('[memory] Saved — total sessions:', memory.sessionCount);
 
-      res.status(200).json({ success: true, sessions: memory.sessionCount });
+        res.status(200).json({ success: true, sessions: memory.sessionCount });
+      } else {
+        console.log('[memory] Too few messages (' + messages.length + ') — saving raw conversation without summarizing');
+        let memory = { sessions: [], summary: null };
+        try {
+          const stored = await redis.get(MEMORY_KEY);
+          const parsed = parseRedisValue(stored);
+          if (parsed) memory = parsed;
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          console.warn('[memory] Could not read existing memory:', errorMsg);
+        }
+
+        memory.sessions = [
+          { date: new Date().toISOString(), summary: `[Raw conversation - ${messages.length} messages]` },
+          ...memory.sessions,
+        ];
+
+        await redis.set(MEMORY_KEY, JSON.stringify(memory));
+        console.log('[memory] Saved raw conversation without summarizing');
+        res.status(200).json({ skipped: true, reason: 'Too few messages for summarization' });
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[memory] POST failed:', errorMsg);
