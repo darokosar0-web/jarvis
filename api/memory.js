@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { Redis } from '@upstash/redis';
 
 const MEMORY_KEY = 'daro-memory';
@@ -26,6 +25,29 @@ function parseRedisValue(value) {
   return null;
 }
 
+function extractKeyInfo(messages) {
+  const text = messages.map(m => typeof m.content === 'string' ? m.content : '').join(' ');
+  const info = {
+    mentions: [],
+    numbers: [],
+    keywords: []
+  };
+
+  // Extract numbers and money
+  const numbers = text.match(/£[\d,]+|\d+%|\d+ clients?|\d+ days?/gi) || [];
+  info.numbers = [...new Set(numbers)].slice(0, 10);
+
+  // Extract capitalized names/places
+  const names = text.match(/\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\b/g) || [];
+  info.mentions = [...new Set(names)].slice(0, 10);
+
+  // Extract action words
+  const actions = text.match(/\b(need to|going to|will|should|must|plan to|want to)\s+\w+/gi) || [];
+  info.keywords = [...new Set(actions)].slice(0, 5);
+
+  return info;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
@@ -43,23 +65,23 @@ export default async (req, res) => {
     return;
   }
 
-  // GET — load persisted memory
+  // GET — load persisted session data
   if (req.method === 'GET') {
     try {
       const stored = await redis.get(MEMORY_KEY);
-      console.log('[memory] Redis returned:', stored ? `${typeof stored} (${stored.toString ? stored.toString().substring(0, 50) : 'N/A'})` : 'null');
-      const memory = parseRedisValue(stored);
-      console.log('[memory] GET ok — sessions:', memory?.sessionCount ?? 0, '— summary:', memory?.summary ? 'YES' : 'NO');
-      res.status(200).json(memory || { sessions: [], summary: null });
+      console.log('[memory] Redis returned:', stored ? `${typeof stored}` : 'null');
+      const sessionData = parseRedisValue(stored);
+      console.log('[memory] GET ok — data found:', sessionData ? 'YES' : 'NO');
+      res.status(200).json(sessionData || { messages: [], keyInfo: { mentions: [], numbers: [], keywords: [] } });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[memory] GET failed:', errorMsg);
-      res.status(200).json({ sessions: [], summary: null, _error: errorMsg });
+      res.status(200).json({ messages: [], keyInfo: { mentions: [], numbers: [], keywords: [] }, _error: errorMsg });
     }
     return;
   }
 
-  // POST — summarise conversation and persist
+  // POST — save conversation and extract key info
   if (req.method === 'POST') {
     try {
       const { messages } = req.body;
@@ -72,126 +94,21 @@ export default async (req, res) => {
 
       console.log('[memory] Processing POST with', messages.length, 'messages');
 
-      const convText = messages
-        .map(m => `${m.role === 'assistant' ? 'Jarvis' : 'Daro'}: ${m.content}`)
-        .join('\n\n');
-
-      if (messages.length >= 6) {
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-        // Comprehensive session summary capturing all details
-        const sessionRes = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: `Extract and summarize EVERYTHING important from this conversation with Daro. Capture:
-- PERSONAL DETAILS (mood, challenges, personal life updates, preferences, interests)
-- BUSINESS (clients, ideas, strategies, pricing, goals, targets)
-- DECISIONS made during this conversation
-- ACTION ITEMS and next steps
-- KEY INSIGHTS about Daro's thinking or priorities
-- Any preferences or patterns in how Daro likes to work
-
-Be specific and concrete. Include numbers, names, and dates where mentioned. This will be used to recall context in future conversations.\n\n${convText}`,
-        }],
-      });
-
-      const sessionSummary = sessionRes.content[0].text;
       const now = new Date().toISOString();
+      const lastTenMessages = messages.slice(-10);
+      const keyInfo = extractKeyInfo(messages);
 
-      // Load existing memory
-      let memory = { sessions: [], summary: null };
-      try {
-        const stored = await redis.get(MEMORY_KEY);
-        const parsed = parseRedisValue(stored);
-        if (parsed) memory = parsed;
-      } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        console.warn('[memory] Could not read existing memory:', errorMsg);
-      }
+      const sessionData = {
+        date: now,
+        messageCount: messages.length,
+        messages: lastTenMessages,
+        keyInfo: keyInfo
+      };
 
-      memory.sessions = [
-        { date: now, summary: sessionSummary },
-        ...memory.sessions,
-      ];
+      await redis.set(MEMORY_KEY, JSON.stringify(sessionData));
+      console.log('[memory] Saved conversation data:', messages.length, 'messages');
 
-      // Rebuild overall profile
-      const sessionsText = memory.sessions
-        .map(s => `[${new Date(s.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}] ${s.summary}`)
-        .join('\n');
-
-      const profileRes = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        messages: [{
-          role: 'user',
-          content: `From these session summaries, create a comprehensive living profile of Daro. Organize into these sections:
-
-PERSONAL PROFILE
-- Personality traits, mood patterns, communication style
-- Personal life situation, challenges, and concerns
-- Values, motivations, what drives him
-- Preferences (how he likes to work, communicate, be advised)
-
-BUSINESS PROFILE
-- Current business status and stage
-- Clients (names, details, status)
-- Revenue, pricing, targets, goals
-- Services offered and ideas being explored
-- Recent pivots or changes in strategy
-
-CURRENT FOCUS & MOMENTUM
-- What's he most focused on right now
-- Active projects and timelines
-- Recent wins or challenges
-- What he needs help with most
-
-ACTION ITEMS & NEXT STEPS
-- Outstanding action items from conversations
-- Decisions that need making
-- Things to follow up on
-
-KEY PATTERNS & INSIGHTS
-- Recurring themes or concerns
-- Decision-making style
-- Learning and adaptation patterns
-
-Be specific with names, numbers, dates. This profile should feel like you know Daro well.\n\n${sessionsText}`,
-        }],
-      });
-
-      memory.summary = profileRes.content[0].text;
-      memory.lastUpdated = now;
-      memory.sessionCount = memory.sessions.length;
-      memory.lastUpdated = now;
-      memory.sessionCount = memory.sessions.length;
-
-        await redis.set(MEMORY_KEY, JSON.stringify(memory));
-        console.log('[memory] Saved — total sessions:', memory.sessionCount);
-
-        res.status(200).json({ success: true, sessions: memory.sessionCount });
-      } else {
-        console.log('[memory] Too few messages (' + messages.length + ') — saving raw conversation without summarizing');
-        let memory = { sessions: [], summary: null };
-        try {
-          const stored = await redis.get(MEMORY_KEY);
-          const parsed = parseRedisValue(stored);
-          if (parsed) memory = parsed;
-        } catch (e) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          console.warn('[memory] Could not read existing memory:', errorMsg);
-        }
-
-        memory.sessions = [
-          { date: new Date().toISOString(), summary: `[Raw conversation - ${messages.length} messages]` },
-          ...memory.sessions,
-        ];
-
-        await redis.set(MEMORY_KEY, JSON.stringify(memory));
-        console.log('[memory] Saved raw conversation without summarizing');
-        res.status(200).json({ skipped: true, reason: 'Too few messages for summarization' });
-      }
+      res.status(200).json({ success: true, saved: sessionData });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[memory] POST failed:', errorMsg);
