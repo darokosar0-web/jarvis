@@ -60,12 +60,12 @@ function buildSystemPrompt(memory) {
     return text.length > maxChars ? text.substring(0, maxChars) + '...' : text;
   };
 
-  const last3Sessions = memory.sessions ? memory.sessions.slice(0, 3) : [];
-  const sessionsSummary = last3Sessions
+  const last2Sessions = memory.sessions ? memory.sessions.slice(0, 2) : [];
+  const sessionsSummary = last2Sessions
     .map((session, index) => {
       const date = new Date(session.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
       const summary = truncateSummary(session.summary, 200);
-      return `Session ${last3Sessions.length - index}: ${date}\n${summary}`;
+      return `Session ${last2Sessions.length - index}: ${date}\n${summary}`;
     })
     .join('\n\n');
 
@@ -171,6 +171,12 @@ export default async (req, res) => {
     console.log('[claude] Memory received:', memory ? 'YES' : 'NO', memory?.sessionCount ? `(${memory.sessionCount} sessions)` : '');
     console.log('[claude] System prompt includes memory:', systemPrompt.includes('MEMORY FROM PREVIOUS SESSIONS'));
 
+    const searchKeywords = ['search', 'find', 'look up', 'latest', 'news', 'current'];
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    const messageText = typeof lastUserMessage === 'string' ? lastUserMessage.toLowerCase() : '';
+    const shouldUseTools = searchKeywords.some(keyword => messageText.includes(keyword));
+    const toolsToUse = shouldUseTools ? TOOLS : [];
+
     // Helper function to detect image media type from base64
     function getImageMediaType(base64, filename = '') {
       if (!base64) return 'image/jpeg';
@@ -226,11 +232,11 @@ export default async (req, res) => {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      tools: TOOLS,
+      tools: toolsToUse,
       messages: messagesForClaude,
     });
 
-    const maxIterations = 5;
+    const maxIterations = 2;
     let iteration = 0;
 
     while (response.stop_reason === 'tool_use' && iteration < maxIterations) {
@@ -276,7 +282,7 @@ export default async (req, res) => {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1024,
         system: systemPrompt,
-        tools: TOOLS,
+        tools: toolsToUse,
         messages: messagesForClaude,
       });
     }
