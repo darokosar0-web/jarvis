@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS — Daro's Command Centre</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scanline"></div>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-hex">J</div>
+      <div class="logo-wordmark">
+        <span class="logo-text">JARVIS</span>
+        <span class="logo-sub">COMMAND CENTRE</span>
+      </div>
+    </div>
+    <div class="clock">
+      <div id="clock-time" class="clock-time">00:00:00</div>
+      <div id="clock-date" class="clock-date">LOADING...</div>
+    </div>
+  </header>
+
+  <main class="dashboard">
+
+    <!-- Weather Widget -->
+    <div class="widget weather-widget">
+      <div class="widget-header">
+        <span class="widget-title">SWANSEA WEATHER</span>
+        <span class="widget-icon">🌍</span>
+      </div>
+      <div class="weather-content">
+        <div class="weather-main">
+          <div id="weather-icon" class="weather-icon">⏳</div>
+          <div class="weather-info">
+            <div id="weather-temp" class="weather-temp">--°C</div>
+            <div id="weather-desc" class="weather-desc">Loading...</div>
+          </div>
+        </div>
+        <div class="weather-stats">
+          <div class="weather-stat">
+            <div class="stat-label">WIND</div>
+            <div id="weather-wind" class="stat-value">--</div>
+          </div>
+          <div class="weather-stat">
+            <div class="stat-label">HUMIDITY</div>
+            <div id="weather-humidity" class="stat-value">--</div>
+          </div>
+          <div class="weather-stat">
+            <div class="stat-label">FEELS LIKE</div>
+            <div id="weather-feels" class="stat-value">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Links Widget -->
+    <div class="widget links-widget">
+      <div class="widget-header">
+        <span class="widget-title">QUICK ACCESS</span>
+        <span class="widget-icon">⚡</span>
+      </div>
+      <div class="links-grid">
+        <a href="https://app.n8n.cloud" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">⚙️</span>
+          <span>n8n</span>
+        </a>
+        <a href="https://cal.com" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">📅</span>
+          <span>Cal.com</span>
+        </a>
+        <a href="https://app.netlify.com" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">🚀</span>
+          <span>Netlify</span>
+        </a>
+        <a href="https://claude.ai" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">🤖</span>
+          <span>Claude</span>
+        </a>
+        <a href="https://docs.google.com/spreadsheets" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">📊</span>
+          <span>Sheets</span>
+        </a>
+        <a href="https://carrd.co" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">🎨</span>
+          <span>Carrd</span>
+        </a>
+        <a href="https://mail.google.com" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">✉️</span>
+          <span>Gmail</span>
+        </a>
+        <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="link-btn">
+          <span class="link-icon">🔑</span>
+          <span>API Keys</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- AI Chat Widget -->
+    <div class="widget chat-widget">
+      <div class="widget-header">
+        <span class="widget-title">JARVIS AI ADVISOR</span>
+        <div class="chat-header-right">
+          <div class="voice-badge">—</div>
+          <div id="memory-badge" class="memory-badge" style="display:none">
+            <span class="memory-icon">🧠</span>
+            <span id="memory-info" class="memory-info">—</span>
+          </div>
+          <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span class="status-text">ONLINE</span>
+          </div>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-footer">
+        <div class="chat-input-row">
+          <input
+            type="text"
+            id="chat-input"
+            class="chat-input"
+            placeholder="Ask Jarvis anything..."
+            autocomplete="off"
+          />
+          <input
+            type="file"
+            id="image-input"
+            class="image-input"
+            accept="image/*"
+            style="display: none"
+          />
+          <button id="image-btn" class="image-btn" title="Upload image">🖼️</button>
+          <button id="tts-toggle-btn" class="tts-toggle-btn" title="Toggle TTS (currently OFF)">🔇</button>
+          <button id="mic-btn" class="mic-btn" title="Click to speak">🎤</button>
+          <button id="send-btn" class="send-btn">SEND</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes Widget -->
+    <div class="widget notes-widget">
+      <div class="widget-header">
+        <span class="widget-title">MISSION NOTES</span>
+        <button id="save-notes" class="save-btn">SAVE</button>
+      </div>
+      <textarea
+        id="notes-area"
+        class="notes-area"
+        placeholder="Targets, ideas, tasks, wins...&#10;&#10;Auto-saves as you type. Ctrl+S to save manually."
+        spellcheck="false"
+      ></textarea>
+    </div>
+
+  </main>
+
+  <!-- Hidden audio element for TTS playback -->
+  <audio id="tts-audio" style="display: none;"></audio>
+
+  <script>
+    // ElevenLabs API Key - Set from build environment or hardcode here
+    window.ELEVENLABS_API_KEY = '__ELEVENLABS_API_KEY__';
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($gitPath = & { try { git --version 2>$null } catch { $null } }; if \\($gitPath\\) { \"Git is available\" } else { \"Git not found in PATH\" })",
+      "PowerShell(vercel *)"
+    ]
+  }
+}
