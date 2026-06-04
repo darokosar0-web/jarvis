@@ -155,6 +155,7 @@ export default async (req, res) => {
   }
 
   try {
+    console.log('[timer] Request started:', Date.now());
     const { messages, memory } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -165,8 +166,10 @@ export default async (req, res) => {
       return;
     }
 
+    console.log('[timer] Fetching memory:', Date.now());
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const systemPrompt = buildSystemPrompt(memory);
+    console.log('[timer] Memory done:', Date.now());
 
     console.log('[claude] Memory received:', memory ? 'YES' : 'NO', memory?.sessionCount ? `(${memory.sessionCount} sessions)` : '');
     console.log('[claude] System prompt includes memory:', systemPrompt.includes('MEMORY FROM PREVIOUS SESSIONS'));
@@ -228,6 +231,7 @@ export default async (req, res) => {
       }
       return msg;
     });
+    console.log('[timer] Calling Claude:', Date.now());
     let response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
@@ -290,6 +294,7 @@ export default async (req, res) => {
     const textBlock = response.content.find(block => block.type === 'text');
     const content = textBlock ? textBlock.text : 'No response generated';
 
+    console.log('[timer] Done:', Date.now());
     Object.entries(headers).forEach(([key, value]) => {
       res.setHeader(key, value);
     });
