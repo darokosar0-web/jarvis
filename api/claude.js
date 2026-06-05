@@ -55,6 +55,24 @@ YOU HAVE ACCESS TO WEB SEARCH:
 function buildSystemPrompt(memory) {
   if (!memory || !memory.summary) return BASE_SYSTEM_PROMPT;
 
+  if (memory && memory.messages && !memory.summary) {
+    const recentMessages = memory.messages
+      .slice(-6)
+      .map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`)
+      .join('\n');
+    const keywords = memory.keywords ? memory.keywords.join(', ') : '';
+    const numbers = memory.numbers ? memory.numbers.join(', ') : '';
+    const mentions = memory.mentions ? memory.mentions.join(', ') : '';
+    return BASE_SYSTEM_PROMPT + `
+===== MEMORY FROM PREVIOUS CONVERSATIONS =====
+Recent messages:
+${recentMessages}
+Key numbers mentioned: ${numbers}
+People/places mentioned: ${mentions}
+Action items: ${keywords}
+==============================================`;
+  }
+
   const truncateSummary = (text, maxChars = 200) => {
     if (!text) return '';
     return text.length > maxChars ? text.substring(0, maxChars) + '...' : text;

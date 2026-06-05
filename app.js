@@ -103,7 +103,7 @@ async function loadMemory() {
     }
     const data = await res.json();
     console.log('[memory] Loaded:', data);
-    if (data && (data.summary || (data.sessions && data.sessions.length > 0))) {
+    if (data && (data.summary || (data.sessions && data.sessions.length > 0) || (data.messages && data.messages.length > 0))) {
       memory = data;
       showMemoryBadge(data);
       console.log('[memory] Using memory in session');
