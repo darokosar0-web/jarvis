@@ -59,8 +59,11 @@ function buildSystemPrompt(memory) {
 
   if (memory && memory.messages && !memory.summary) {
     const recentMessages = memory.messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .filter(m => typeof m.content === 'string' && m.content.length > 10)
+      .filter(m => !m.content.includes('opening for the first time'))
       .slice(-6)
-      .map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`)
+      .map(m => `${m.role}: ${m.content.substring(0, 150)}`)
       .join('\n');
     const keywords = memory.keyInfo?.keywords ? memory.keyInfo.keywords.join(', ') : '';
     const numbers = memory.keyInfo?.numbers ? memory.keyInfo.numbers.join(', ') : '';
