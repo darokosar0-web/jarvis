@@ -60,9 +60,9 @@ function buildSystemPrompt(memory) {
       .slice(-6)
       .map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`)
       .join('\n');
-    const keywords = memory.keywords ? memory.keywords.join(', ') : '';
-    const numbers = memory.numbers ? memory.numbers.join(', ') : '';
-    const mentions = memory.mentions ? memory.mentions.join(', ') : '';
+    const keywords = memory.keyInfo?.keywords ? memory.keyInfo.keywords.join(', ') : '';
+    const numbers = memory.keyInfo?.numbers ? memory.keyInfo.numbers.join(', ') : '';
+    const mentions = memory.keyInfo?.mentions ? memory.keyInfo.mentions.join(', ') : '';
     return BASE_SYSTEM_PROMPT + `
 ===== MEMORY FROM PREVIOUS CONVERSATIONS =====
 Recent messages:
