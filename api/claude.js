@@ -53,6 +53,7 @@ YOU HAVE ACCESS TO WEB SEARCH:
 - Cite sources with URLs when using search results`;
 
 function buildSystemPrompt(memory) {
+  console.log('[memory] buildSystemPrompt received:', JSON.stringify(memory).substring(0, 200));
   if (!memory) return BASE_SYSTEM_PROMPT;
   if (!memory.summary && (!memory.messages || memory.messages.length === 0)) return BASE_SYSTEM_PROMPT;
 
