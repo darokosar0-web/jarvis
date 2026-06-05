@@ -48,62 +48,32 @@ YOU HAVE ACCESS TO WEB SEARCH:
 
 function buildSystemPrompt(memory) {
   console.log('[memory] buildSystemPrompt received:', JSON.stringify(memory).substring(0, 200));
-  if (!memory) return BASE_SYSTEM_PROMPT;
-  if (!memory.summary && (!memory.messages || memory.messages.length === 0)) return BASE_SYSTEM_PROMPT;
 
-  if (memory && memory.messages && !memory.summary) {
-    const recentMessages = memory.messages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .filter(m => typeof m.content === 'string' && m.content.length > 10)
-      .filter(m => !m.content.includes('opening for the first time'))
-      .slice(-6)
-      .map(m => `${m.role}: ${m.content.substring(0, 150)}`)
-      .join('\n');
-    const keywords = memory.keyInfo?.keywords ? memory.keyInfo.keywords.join(', ') : '';
-    const numbers = memory.keyInfo?.numbers ? memory.keyInfo.numbers.join(', ') : '';
-    const mentions = memory.keyInfo?.mentions ? memory.keyInfo.mentions.join(', ') : '';
-    return BASE_SYSTEM_PROMPT + `
-===== MEMORY FROM PREVIOUS CONVERSATIONS =====
-Recent messages:
-${recentMessages}
-Key numbers mentioned: ${numbers}
-People/places mentioned: ${mentions}
-Action items: ${keywords}
-==============================================`;
+  if (!memory || !memory.messages || memory.messages.length === 0) {
+    return BASE_SYSTEM_PROMPT;
   }
 
-  const truncateSummary = (text, maxChars = 200) => {
-    if (!text) return '';
-    return text.length > maxChars ? text.substring(0, maxChars) + '...' : text;
-  };
+  const recentMessages = memory.messages
+    .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.length > 5)
+    .slice(-8)
+    .map(m => `${m.role === 'user' ? 'Daro' : 'Jarvis'}: ${m.content.substring(0, 200)}`)
+    .join('\n');
 
-  const last2Sessions = memory.sessions ? memory.sessions.slice(0, 2) : [];
-  const sessionsSummary = last2Sessions
-    .map((session, index) => {
-      const date = new Date(session.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-      const summary = truncateSummary(session.summary, 200);
-      return `Session ${last2Sessions.length - index}: ${date}\n${summary}`;
-    })
-    .join('\n\n');
+  if (!recentMessages) return BASE_SYSTEM_PROMPT;
+
+  const numbers = memory.keyInfo?.numbers?.join(', ') || '';
+  const mentions = memory.keyInfo?.mentions?.join(', ') || '';
+  const keywords = memory.keyInfo?.keywords?.join(', ') || '';
 
   return BASE_SYSTEM_PROMPT + `
 
-===== MEMORY FROM PREVIOUS CONVERSATIONS (Last 3 Sessions) =====
-${sessionsSummary}
-
-${memory.sessionCount ? `Total conversations: ${memory.sessionCount}` : ''}
-========================================================
-
-IMPORTANT MEMORY USAGE GUIDELINES:
-- Reference specific details from memory naturally (names, clients, numbers, decisions)
-- Ask follow-up questions on previous topics to show you remember and care about continuity
-- Proactively remind him of action items or commitments made in past conversations
-- Show understanding of his personal situation, mood, and communication style
-- Reference patterns you've noticed in his thinking and decision-making
-- Use this memory to be more strategic and personalized in your advice
-- Don't treat memory as a checklist to read — weave it into natural conversation
-
-Remember: You know Daro well from multiple previous conversations. Act like a trusted advisor who understands both his business and personal context.`;
+===== MEMORY FROM PREVIOUS CONVERSATIONS =====
+${recentMessages}
+${numbers ? `Numbers/money mentioned: ${numbers}` : ''}
+${mentions ? `Names/places mentioned: ${mentions}` : ''}
+${keywords ? `Action items: ${keywords}` : ''}
+==============================================
+You have memory of previous conversations above. Reference it naturally. Do NOT say this is your first conversation.`;
 }
 
 const TOOLS = [
