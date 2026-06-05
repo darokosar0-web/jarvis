@@ -53,7 +53,8 @@ YOU HAVE ACCESS TO WEB SEARCH:
 - Cite sources with URLs when using search results`;
 
 function buildSystemPrompt(memory) {
-  if (!memory || !memory.summary) return BASE_SYSTEM_PROMPT;
+  if (!memory) return BASE_SYSTEM_PROMPT;
+  if (!memory.summary && (!memory.messages || memory.messages.length === 0)) return BASE_SYSTEM_PROMPT;
 
   if (memory && memory.messages && !memory.summary) {
     const recentMessages = memory.messages
