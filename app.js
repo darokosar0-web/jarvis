@@ -169,7 +169,6 @@ let isListening = false;
 let currentUtterance = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-// ElevenLabs Configuration
 const ELEVENLABS_VOICE_ID = 'GtSp2hTKSZw927goiuGK';
 const ELEVENLABS_MODEL = 'eleven_turbo_v2';
 const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech/';
@@ -183,12 +182,10 @@ async function speakMessage(text) {
   try {
     const apiKey = window.ELEVENLABS_API_KEY;
     if (!apiKey || apiKey === '__ELEVENLABS_API_KEY__') {
-      console.warn('ElevenLabs API key not configured. Set ELEVENLABS_API_KEY environment variable.');
+      console.warn('ElevenLabs API key not configured.');
       speakWithBrowser(text);
       return;
     }
-
-    console.log('Calling ElevenLabs TTS directly for:', text.substring(0, 50) + '...');
 
     const url = `${ELEVENLABS_API_URL}${ELEVENLABS_VOICE_ID}`;
 
@@ -209,11 +206,7 @@ async function speakMessage(text) {
       }),
     });
 
-    console.log('ElevenLabs response status:', response.status, response.ok);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs error:', response.status, errorText);
       throw new Error(`ElevenLabs error: ${response.status}`);
     }
 
@@ -221,37 +214,27 @@ async function speakMessage(text) {
     const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
     const audioUrl = URL.createObjectURL(audioBlob);
 
-    console.log('✓ Audio generated:', audioBuffer.byteLength, 'bytes');
-
     const audio = document.getElementById('tts-audio');
     if (!audio) {
-      console.error('Audio element not found');
       speakWithBrowser(text);
       return;
     }
 
     audio.src = audioUrl;
-
     audio.onended = () => {
       updateVoiceIndicator(null);
       currentUtterance = null;
       URL.revokeObjectURL(audioUrl);
     };
-
     audio.onerror = () => {
-      console.error('Audio playback error');
       updateVoiceIndicator(null);
       speakWithBrowser(text);
     };
 
     currentUtterance = { type: 'audio', element: audio };
-    audio.play().catch((err) => {
-      console.error('Audio play failed:', err);
-      speakWithBrowser(text);
-    });
+    audio.play().catch(() => speakWithBrowser(text));
   } catch (err) {
     console.error('ElevenLabs TTS error:', err.message || err);
-    console.log('Falling back to browser TTS due to error');
     speakWithBrowser(text);
   }
 }
@@ -262,17 +245,8 @@ function speakWithBrowser(text) {
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
   utterance.lang = 'en-US';
-
-  utterance.onend = () => {
-    currentUtterance = null;
-    updateVoiceIndicator(null);
-  };
-
-  utterance.onerror = (e) => {
-    console.error('Browser TTS error:', e);
-    updateVoiceIndicator(null);
-  };
-
+  utterance.onend = () => { currentUtterance = null; updateVoiceIndicator(null); };
+  utterance.onerror = () => updateVoiceIndicator(null);
   currentUtterance = { type: 'utterance', object: utterance };
   speechSynthesis.speak(utterance);
   updateVoiceIndicator('speaking');
@@ -280,25 +254,18 @@ function speakWithBrowser(text) {
 
 function stopSpeaking() {
   if (!currentUtterance) return;
-
   if (currentUtterance.type === 'audio') {
-    const audio = currentUtterance.element;
-    audio.pause();
-    audio.currentTime = 0;
-  } else if (currentUtterance.type === 'utterance') {
+    currentUtterance.element.pause();
+    currentUtterance.element.currentTime = 0;
+  } else {
     speechSynthesis.cancel();
   }
-
   currentUtterance = null;
   updateVoiceIndicator(null);
 }
 
 function startListening() {
-  if (!SpeechRecognition) {
-    alert('Speech recognition not supported in this browser');
-    return;
-  }
-
+  if (!SpeechRecognition) { alert('Speech recognition not supported'); return; }
   if (isListening) return;
 
   const recognition = new SpeechRecognition();
@@ -306,62 +273,25 @@ function startListening() {
   recognition.interimResults = true;
   recognition.lang = 'en-US';
 
-  recognition.onstart = () => {
-    isListening = true;
-    updateVoiceIndicator('listening');
-    micBtn?.classList.add('mic-active');
-  };
-
+  recognition.onstart = () => { isListening = true; updateVoiceIndicator('listening'); micBtn?.classList.add('mic-active'); };
   recognition.onresult = (event) => {
     let transcript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      const t = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        transcript = t;
-      }
+      if (event.results[i].isFinal) transcript = event.results[i][0].transcript;
     }
-    if (transcript) {
-      chatInput.value = transcript;
-    }
+    if (transcript) chatInput.value = transcript;
   };
-
-  recognition.onend = () => {
-    isListening = false;
-    updateVoiceIndicator(null);
-    micBtn?.classList.remove('mic-active');
-  };
-
-  recognition.onerror = (event) => {
-    console.error('Speech recognition error:', event.error);
-    updateVoiceIndicator(null);
-    micBtn?.classList.remove('mic-active');
-    isListening = false;
-  };
-
+  recognition.onend = () => { isListening = false; updateVoiceIndicator(null); micBtn?.classList.remove('mic-active'); };
+  recognition.onerror = () => { isListening = false; updateVoiceIndicator(null); micBtn?.classList.remove('mic-active'); };
   recognition.start();
-}
-
-function toggleVoiceOutput() {
-  voiceEnabled = !voiceEnabled;
-  const badge = document.querySelector('.voice-toggle');
-  if (badge) {
-    badge.textContent = voiceEnabled ? '🔊' : '🔇';
-  }
 }
 
 function updateVoiceIndicator(state) {
   const badge = document.querySelector('.voice-badge');
   if (!badge) return;
-
-  if (state === 'listening') {
-    badge.textContent = '🎤 LISTENING...';
-    badge.classList.add('active');
-  } else if (state === 'speaking') {
-    badge.textContent = '🔊 SPEAKING...';
-    badge.classList.add('active');
-  } else {
-    badge.classList.remove('active');
-  }
+  if (state === 'listening') { badge.textContent = '🎤 LISTENING...'; badge.classList.add('active'); }
+  else if (state === 'speaking') { badge.textContent = '🔊 SPEAKING...'; badge.classList.add('active'); }
+  else { badge.classList.remove('active'); }
 }
 
 /* ===== IMAGE UPLOAD ===== */
@@ -369,7 +299,7 @@ function displaySelectedImage(base64, filename) {
   if (!selectedImage) {
     selectedImage = { base64, filename };
     imageBtn.classList.add('image-selected');
-    imageBtn.title = `Image selected: ${filename} (${Math.round(base64.length / 1024)}KB)`;
+    imageBtn.title = `Image selected: ${filename}`;
   }
 }
 
@@ -380,40 +310,21 @@ function clearSelectedImage() {
   imageBtn.title = 'Upload image';
 }
 
-imageBtn?.addEventListener('click', () => {
-  imageInput.click();
-});
-
+imageBtn?.addEventListener('click', () => imageInput.click());
 imageInput?.addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
-
-  if (!file.type.startsWith('image/')) {
-    alert('Please select an image file');
-    imageInput.value = '';
-    return;
-  }
-
-  try {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result?.split(',')[1];
-      if (base64) {
-        displaySelectedImage(base64, file.name);
-        console.log('[image] Selected:', file.name, base64.length, 'bytes');
-      }
-    };
-    reader.readAsDataURL(file);
-  } catch (err) {
-    console.error('[image] Error reading file:', err);
-  }
+  if (!file.type.startsWith('image/')) { alert('Please select an image file'); imageInput.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const base64 = event.target?.result?.split(',')[1];
+    if (base64) displaySelectedImage(base64, file.name);
+  };
+  reader.readAsDataURL(file);
 });
 
 function escHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function renderText(text) {
@@ -423,9 +334,9 @@ function renderText(text) {
     .replace(/\n/g, '<br>');
 }
 
-function appendMessage(role, content, isTyping = false) {
+function appendMessage(role, content) {
   const wrap = document.createElement('div');
-  wrap.className = `message ${role}${isTyping ? ' typing' : ''}`;
+  wrap.className = `message ${role}`;
 
   const avatar = document.createElement('div');
   avatar.className = 'msg-avatar';
@@ -433,16 +344,7 @@ function appendMessage(role, content, isTyping = false) {
 
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
-
-  if (isTyping) {
-    bubble.innerHTML =
-      '<span class="typing-dot"></span>' +
-      '<span class="typing-dot"></span>' +
-      '<span class="typing-dot"></span>';
-    wrap.id = 'typing-indicator';
-  } else {
-    bubble.innerHTML = renderText(content);
-  }
+  bubble.innerHTML = content ? renderText(content) : '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
 
   wrap.appendChild(avatar);
   wrap.appendChild(bubble);
@@ -457,19 +359,52 @@ function removeTyping() {
   if (el) el.remove();
 }
 
-async function callJarvis(messages) {
-  console.log('[jarvis] Sending request with memory:', memory ? 'YES' : 'NO', memory?.sessionCount ? `(${memory.sessionCount} sessions)` : '');
+/* ===== CALL JARVIS WITH STREAMING ===== */
+async function callJarvis(messages, onChunk) {
+  console.log('[jarvis] Sending request with memory:', memory ? 'YES' : 'NO');
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, memory }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.content;
+
+  const contentType = res.headers.get('content-type') || '';
+
+  // Web search = normal JSON response
+  if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data.content;
+  }
+
+  // Normal message = streaming
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n');
+
+    for (const line of lines) {
+      if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+        try {
+          const { text } = JSON.parse(line.slice(6));
+          fullText += text;
+          if (onChunk) onChunk(fullText);
+        } catch {}
+      }
+    }
+  }
+
+  return fullText;
 }
 
+/* ===== SEND MESSAGE ===== */
 async function sendMessage() {
   const text = chatInput.value.trim();
   if ((!text && !selectedImage) || busy) return;
@@ -489,21 +424,24 @@ async function sendMessage() {
   }
 
   history.push({ role: 'user', content: messageContent });
-  appendMessage('jarvis', '', true);
+
+  // Create streaming bubble immediately
+  const streamBubble = appendMessage('jarvis', '...');
 
   try {
-    const reply = await callJarvis(history);
-    removeTyping();
-    appendMessage('jarvis', reply);
+  const reply = await callJarvis(history, (partial) => {
+      streamBubble.querySelector('.msg-bubble').innerHTML = renderText(partial);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    // Final render
+    streamBubble.querySelector('.msg-bubble').innerHTML = renderText(reply);
     speakMessage(reply);
     history.push({ role: 'assistant', content: reply });
     clearSelectedImage();
-
-    // Save memory after every exchange
     await saveMemory();
   } catch (err) {
-    removeTyping();
-    appendMessage('jarvis', 'Connection error. Check your API key is set in Vercel environment variables.');
+    streamBubble.querySelector('.msg-bubble').innerHTML = 'Connection error. Check your API key is set in Vercel environment variables.';
     console.error('Jarvis error:', err);
   } finally {
     busy = false;
@@ -518,40 +456,52 @@ chatInput.addEventListener('keydown', (e) => {
 });
 micBtn?.addEventListener('click', startListening);
 
-// TTS Toggle Button
 const ttsToggleBtn = document.getElementById('tts-toggle-btn');
 ttsToggleBtn?.addEventListener('click', () => {
   voiceEnabled = !voiceEnabled;
   const emoji = voiceEnabled ? '🔊' : '🔇';
-  const status = voiceEnabled ? 'ON' : 'OFF';
   ttsToggleBtn.textContent = emoji;
-  ttsToggleBtn.title = `Toggle TTS (currently ${status})`;
-  console.log('[voice] TTS', status);
+  ttsToggleBtn.title = `Toggle TTS (currently ${voiceEnabled ? 'ON' : 'OFF'})`;
 });
 
 /* ===== INIT ===== */
 (async function initJarvis() {
-  appendMessage('jarvis', '', true);
+  appendMessage('jarvis', '');
 
   await loadMemory();
 
   const hasMemory = memory && memory.summary;
   const greetContent = hasMemory
-    ? 'You are opening Jarvis. You have memory from previous conversations with Daro. Greet him by name, briefly and naturally acknowledge something specific from your memory (1 sentence — be concrete, not vague), then ask what he needs help with today. Sharp and under 3 sentences.'
-    : 'You are opening for the first time with no prior memory. Greet Daro by name in 2-3 sentences — sharp and straight to the point. Then ask what he needs help with today.';
+    ? 'Greet Daro. Acknowledge something specific from memory. Ask what he needs today. Under 3 sentences, sharp.'
+    : 'Greet Daro. You know who he is — 25, Swansea, building an AI agency, chasing financial freedom. Be sharp, direct, under 3 sentences. Ask what he needs today.';
 
   const initMessages = [{ role: 'user', content: greetContent }];
 
   try {
-    const greeting = await callJarvis(initMessages);
-    removeTyping();
-    appendMessage('jarvis', greeting);
+    const greeting = await callJarvis(initMessages, (partial) => {
+      const bubbles = chatMessages.querySelectorAll('.msg-bubble');
+      const last = bubbles[bubbles.length - 1];
+      if (last) last.innerHTML = renderText(partial);
+    });
+
+    const bubbles = chatMessages.querySelectorAll('.msg-bubble');
+    const last = bubbles[bubbles.length - 1];
+    if (last) last.innerHTML = renderText(greeting);
+
     history = [
       { role: 'user', content: greetContent },
       { role: 'assistant', content: greeting },
     ];
   } catch {
-    removeTyping();
-    appendMessage('jarvis', "Jarvis online. What do you need, Daro?");
+    const bubbles = chatMessages.querySelectorAll('.msg-bubble');
+    const last = bubbles[bubbles.length - 1];
+    if (last) last.innerHTML = 'Jarvis online. What do you need, Daro?';
   }
-}());
+document.getElementById('clear-memory-btn')?.addEventListener('click', async () => {
+  if (!confirm('Clear all Jarvis memory?')) return;
+  await fetch('/api/memory', { method: 'DELETE' });
+  memory = null;
+  const badge = document.getElementById('memory-badge');
+  if (badge) badge.style.display = 'none';
+  alert('Memory cleared.');
+});}());

@@ -2,6 +2,11 @@
   "version": 2,
   "buildCommand": null,
   "outputDirectory": ".",
+  "functions": {
+    "api/claude.js": {
+      "maxDuration": 30
+    }
+  },
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "handle": "filesystem" },

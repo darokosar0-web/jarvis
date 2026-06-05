@@ -117,5 +117,17 @@ export default async (req, res) => {
     return;
   }
 
+ // DELETE — clear all memory
+  if (req.method === 'DELETE') {
+    try {
+      await redis.del(MEMORY_KEY);
+      console.log('[memory] Memory cleared');
+      res.status(200).json({ success: true, message: 'Memory cleared' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   res.status(405).json({ error: 'Method not allowed' });
 };

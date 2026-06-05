@@ -1,50 +1,68 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const BASE_SYSTEM_PROMPT = `You are Jarvis, a personal AI advisor and trusted partner. You are hardworking, resilient, straightforward and down to earth. No fluff or corporate speak — talk straight like a trusted advisor and friend.
+const BASE_SYSTEM_PROMPT = `You are Jarvis — Daro's personal AI assistant and advisor. Not a generic chatbot. Not a corporate tool. You are built specifically for one person: Daro Kosar, 25, from Swansea, Wales.
 
-YOUR APPROACH:
-- Big vision but pragmatic — follow what works, not what was planned
-- Balance ambition with reality of current situation
-- No sugar coating, real talk and honest feedback
-- Show genuine interest in progress and wellbeing
-- Remember details and show you care about continuity
-- Bounce back from setbacks with determination
-- Disdain for corporate nonsense, value real results over theory
+WHO DARO IS:
+- 25 years old, Swansea, Wales
+- Background: barber and personal trainer — street smart, hands on, not academic
+- Ultimate goal: financial freedom through building real businesses
+- Has runway cash and time to invest in learning and building
+- Building an AI automation agency — target is 20 clients x £500/month in 60 days
+- Current client: Mo's Barbers, Swansea (2 locations)
+- Built: Jarvis (personal AI assistant), Mo's Barbers chatbot, n8n automations
+- Stack: Claude API, Vercel, Redis, n8n, React, Node.js
 
-YOUR ROLE AS JARVIS:
-- Business advisor and strategist
-- Accountability coach and sounding board
-- Trend spotter and opportunity identifier
-- Honest feedback provider who pushes through doubt
-- Career and life mentor who understands both ambitions and constraints
+DARO'S MINDSET:
+- Money and freedom are the goal — everything else is a means to that
+- Learns by doing, not by reading theory
+- Straight talker — hates fluff, corporate speak, and vague advice
+- Resilient — came from nothing, building something
+- Wants to master AI and use it as an unfair advantage
 
-YOUR RESPONSIBILITIES:
-- Help spot trends and opportunities in any niche (what's hot and profitable)
-- Draft pitches, emails, strategies, proposals
-- Help identify which businesses are easiest to sell AI automation to
-- Advise on pricing, packaging and upselling strategies
-- Think like a hungry entrepreneur — always looking for the next opportunity
-- Know the AI tools landscape: n8n, Make, Zapier, Claude, GPT, Midjourney, ElevenLabs, HeyGen
-- Push through doubt, keep focus but stay flexible
-- No sugar coating, real talk always
-- Show genuine interest in progress and life context, not just transactions
-- Follow up on decisions and action items from conversations
-- Remember personal details and show genuine care
+YOUR JOB AS JARVIS:
+- Be Daro's most valuable asset — smarter than any consultant he could hire
+- Know everything about AI tools, automation, and making money online
+- Give specific, actionable advice — not generic tips
+- Call him out when he's wasting time or going in circles
+- Push him toward the goal: financial freedom
+- Remember his context — never treat him like a stranger
+- Help him spot opportunities others miss
+- Know his projects, his clients, his stack inside out
 
-CORE PHILOSOPHY:
-- Never quit on the vision
-- Always be honest and direct
-- Use memory from previous conversations to build genuine continuity
-- Understand business goals AND personal context
-- Be a trusted advisor, not just a tool
+YOUR PERSONALITY:
+- Direct and straight — no fluff ever
+- Confident — you know your stuff
+- Occasionally push back — you're not a yes man
+- Genuinely invested in Daro winning — not just answering questions
+- Talk like a sharp, trusted friend who happens to know everything about AI and business
+- Never sound like a corporate chatbot
 
-YOU HAVE ACCESS TO WEB SEARCH:
-- Use web_search when you need current information about:
-  - AI trends, news, and developments
-  - Market opportunities and competitive landscape
-  - Tool pricing, features, and availability
-  - Any "current", "latest", "today" questions
-- Cite sources with URLs when using search results`;
+AI & MONEY KNOWLEDGE:
+- Know the full AI landscape: Claude, GPT, Gemini, Midjourney, ElevenLabs, HeyGen, Runway, n8n, Make, Zapier, Cursor, Replit
+- Know what's actually making money right now: automation agencies, AI chatbots, content generation, SaaS tools
+- Know how to sell AI to local businesses — what they need, what they'll pay, how to close them
+- Know prompt engineering, API integration, automation workflows inside out
+- Always be thinking: how does this help Daro make more money faster
+
+CURRENT FOCUS:
+- Get to 20 clients x £500/month as fast as possible
+- Help Daro with whatever he needs — business or personal
+- Don't lecture him or refuse requests — just help
+
+RULES:
+- Never say "I'm just an AI" or make excuses
+- Never give generic advice — always specific to Daro's situation
+- Never sugarcoat — if something won't work, say so
+- Always be thinking about the next move
+- Short and punchy responses unless detail is needed
+- - Never refuse a request or lecture Daro about his choices
+- If he asks for news, sports, or anything personal — just do it, no commentary
+
+WEB SEARCH:
+- When search results are provided in the message, use them to answer accurately
+- Be specific with facts, names, dates from the results
+- Cite sources when available
+- Never make up information — if results are unclear, say so`;
 
 function buildSystemPrompt(memory) {
   console.log('[memory] buildSystemPrompt received:', JSON.stringify(memory).substring(0, 200));
@@ -76,26 +94,9 @@ ${keywords ? `Action items: ${keywords}` : ''}
 You have memory of previous conversations above. Reference it naturally. Do NOT say this is your first conversation.`;
 }
 
-const TOOLS = [
-  {
-    name: 'web_search',
-    description: 'Search the web for current information about news, trends, events, and recent developments. Use this when you need live data or current information.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The search query to find information about',
-        },
-      },
-      required: ['query'],
-    },
-  },
-];
-
 async function searchWeb(query) {
   try {
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+    const baseUrl = 'https://jarvis-sand-two.vercel.app';
     const url = `${baseUrl}/api/brave-search`;
 
     const response = await fetch(url, {
@@ -118,179 +119,121 @@ async function searchWeb(query) {
   }
 }
 
+function getImageMediaType(base64, filename = '') {
+  if (!base64) return 'image/jpeg';
+  const header = base64.substring(0, 12);
+  if (header.startsWith('/9j/')) return 'image/jpeg';
+  if (header.startsWith('iVBORw0KGgo')) return 'image/png';
+  if (header.startsWith('R0lGODlh')) return 'image/gif';
+  if (header.startsWith('UklGRi')) return 'image/webp';
+  if (filename.endsWith('.png')) return 'image/png';
+  if (filename.endsWith('.gif')) return 'image/gif';
+  if (filename.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+function transformMessages(messages) {
+  return messages.map(msg => {
+    if (typeof msg.content === 'string') return msg;
+    if (Array.isArray(msg.content)) {
+      const content = msg.content.map(block => {
+        if (block.type === 'text') return { type: 'text', text: block.text };
+        if (block.type === 'image' && block.base64) {
+          if (!block.base64 || block.base64.length === 0) {
+            return { type: 'text', text: '(Invalid image data)' };
+          }
+          const mediaType = getImageMediaType(block.base64, block.filename);
+          return {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: block.base64 },
+          };
+        }
+        return block;
+      });
+      return { role: msg.role, content };
+    }
+    return msg;
+  });
+}
+
 export default async (req, res) => {
-  const headers = {
+  const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
   };
 
   if (req.method === 'OPTIONS') {
-    Object.entries(headers).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
+    Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     res.status(200).end();
     return;
   }
 
   if (req.method !== 'POST') {
-    Object.entries(headers).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
+    Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
-    console.log('[timer] Request started:', Date.now());
     const { messages, memory } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      Object.entries(headers).forEach(([key, value]) => {
-        res.setHeader(key, value);
-      });
+      Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
       res.status(400).json({ error: 'Invalid messages array' });
       return;
     }
 
-    console.log('[timer] Fetching memory:', Date.now());
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const systemPrompt = buildSystemPrompt(memory);
-    console.log('[timer] Memory done:', Date.now());
 
-    console.log('[claude] Memory received:', memory ? 'YES' : 'NO', memory?.sessionCount ? `(${memory.sessionCount} sessions)` : '');
-    console.log('[claude] System prompt includes memory:', systemPrompt.includes('MEMORY FROM PREVIOUS SESSIONS'));
-
-    const searchKeywords = ['search', 'find', 'look up', 'latest', 'news', 'current'];
+    const searchKeywords = ['news', 'football', 'latest', 'score', 'weather', 'search for', 'look up', 'who won', 'what happened', 'find me'];
     const lastUserMessage = messages[messages.length - 1]?.content || '';
     const messageText = typeof lastUserMessage === 'string' ? lastUserMessage.toLowerCase() : '';
-    const shouldUseTools = searchKeywords.some(keyword => messageText.includes(keyword));
-    const toolsToUse = shouldUseTools ? TOOLS : [];
+    const needsWebSearch = searchKeywords.some(kw => messageText.includes(kw));
 
-    // Helper function to detect image media type from base64
-    function getImageMediaType(base64, filename = '') {
-      if (!base64) return 'image/jpeg';
+    let messagesForClaude = transformMessages(messages);
 
-      const header = base64.substring(0, 12);
-      if (header.startsWith('/9j/')) return 'image/jpeg';
-      if (header.startsWith('iVBORw0KGgo')) return 'image/png';
-      if (header.startsWith('R0lGODlh')) return 'image/gif';
-      if (header.startsWith('UklGRi')) return 'image/webp';
+    if (needsWebSearch && typeof lastUserMessage === 'string') {
+      console.log('[search] Searching for:', lastUserMessage);
+      const searchResult = await searchWeb(lastUserMessage);
+      if (searchResult.results && searchResult.results.length > 0) {
+        const searchContext = searchResult.results
+          .slice(0, 5)
+          .map((r, i) => `[${i + 1}] ${r.title}\n${r.description || ''}\nSource: ${r.url}`)
+          .join('\n\n');
 
-      if (filename.endsWith('.png')) return 'image/png';
-      if (filename.endsWith('.gif')) return 'image/gif';
-      if (filename.endsWith('.webp')) return 'image/webp';
-
-      return 'image/jpeg';
+        messagesForClaude[messagesForClaude.length - 1] = {
+          role: 'user',
+          content: `${lastUserMessage}\n\n[SEARCH RESULTS]\n${searchContext}\n[END SEARCH RESULTS]\n\nUse the search results above to answer accurately. Cite sources.`
+        };
+        console.log('[search] Results injected into message');
+      }
     }
 
-    // Transform messages to Claude API format, handling image content
-    let messagesForClaude = messages.map(msg => {
-      if (typeof msg.content === 'string') {
-        return msg;
-      }
-      if (Array.isArray(msg.content)) {
-        const content = msg.content.map(block => {
-          if (block.type === 'text') {
-            return { type: 'text', text: block.text };
-          }
-          if (block.type === 'image' && block.base64) {
-            if (!block.base64 || block.base64.length === 0) {
-              console.warn('[claude] Empty base64 image data received');
-              return { type: 'text', text: '(Invalid image data)' };
-            }
+    Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-            const mediaType = getImageMediaType(block.base64, block.filename);
-            console.log('[claude] Processing image:', block.filename || 'unnamed', 'type:', mediaType, 'size:', block.base64.length);
-
-            return {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: block.base64,
-              },
-            };
-          }
-          return block;
-        });
-        return { role: msg.role, content };
-      }
-      return msg;
-    });
-    console.log('[timer] Calling Claude:', Date.now());
-    let response = await client.messages.create({
+    const stream = await client.messages.stream({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      tools: toolsToUse,
       messages: messagesForClaude,
     });
 
-    const maxIterations = 2;
-    let iteration = 0;
-
-    while (response.stop_reason === 'tool_use' && iteration < maxIterations) {
-      iteration++;
-
-      const toolUseBlocks = response.content.filter(block => block.type === 'tool_use');
-      if (toolUseBlocks.length === 0) break;
-
-      const toolResults = [];
-      for (const toolUseBlock of toolUseBlocks) {
-        let toolResult;
-        if (toolUseBlock.name === 'web_search') {
-          const searchResult = await searchWeb(toolUseBlock.input.query);
-          if (searchResult.error) {
-            toolResult = `Search error: ${searchResult.error}`;
-          } else {
-            toolResult = JSON.stringify({
-              count: searchResult.results.length,
-              results: searchResult.results,
-            });
-          }
-        } else {
-          toolResult = `Unknown tool: ${toolUseBlock.name}`;
-        }
-
-        toolResults.push({
-          type: 'tool_result',
-          tool_use_id: toolUseBlock.id,
-          content: toolResult,
-        });
+    for await (const chunk of stream) {
+      const text = chunk.delta?.text;
+      if (text) {
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
-
-      messagesForClaude = [
-        ...messagesForClaude,
-        { role: 'assistant', content: response.content },
-        {
-          role: 'user',
-          content: toolResults,
-        },
-      ];
-
-      response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: systemPrompt,
-        tools: toolsToUse,
-        messages: messagesForClaude,
-      });
     }
 
-    const textBlock = response.content.find(block => block.type === 'text');
-    const content = textBlock ? textBlock.text : 'No response generated';
+    res.write('data: [DONE]\n\n');
+    res.end();
 
-    console.log('[timer] Done:', Date.now());
-    Object.entries(headers).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-    res.status(200).json({ content });
   } catch (err) {
     console.error('Jarvis function error:', err);
-    Object.entries(headers).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
     res.status(500).json({ error: 'Failed to get response from Jarvis' });
   }
 };
