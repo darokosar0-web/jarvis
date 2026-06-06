@@ -5,6 +5,21 @@
   "functions": {
     "api/claude.js": {
       "maxDuration": 30
+    },
+    "api/memory.js": {
+      "maxDuration": 15
+    },
+    "api/brave-search.js": {
+      "maxDuration": 15
+    },
+    "api/elevenlabs-tts.js": {
+      "maxDuration": 20
+    },
+    "api/todos.js": {
+      "maxDuration": 10
+    },
+    "api/chat.js": {
+      "maxDuration": 15
     }
   },
   "routes": [
