@@ -4,3 +4,8 @@
 .vercel
 
 .env
+
+
+*.log
+
+node_modules/
