@@ -12,6 +12,34 @@
 <body>
   <div class="scanline"></div>
 
+  <!-- LOGIN PAGE -->
+  <div id="login-container" class="login-container" style="display: none;">
+    <div class="login-panel">
+      <div class="login-header">
+        <div class="logo-hex-login">J</div>
+        <h1>JARVIS</h1>
+        <p>COMMAND CENTRE</p>
+      </div>
+      <form id="login-form" class="login-form">
+        <div class="login-group">
+          <label for="password-input">ACCESS CODE</label>
+          <input
+            type="password"
+            id="password-input"
+            class="password-input"
+            placeholder="Enter password..."
+            autocomplete="off"
+            required
+          />
+        </div>
+        <button type="submit" class="login-btn">AUTHENTICATE</button>
+        <div id="login-error" class="login-error" style="display: none;"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard-container" class="dashboard-container" style="display: none;">
   <header class="header">
     <div class="logo">
       <div class="logo-hex">J</div>
@@ -144,7 +172,7 @@
     </div>
 
     <!-- Notes Widget -->
-    <div class="widget notes-widget">
+    <div class="widget mission-notes">
       <div class="widget-header">
         <span class="widget-title">MISSION NOTES</span>
         <button id="save-notes" class="save-btn">SAVE</button>
@@ -157,14 +185,36 @@
       ></textarea>
     </div>
 
-  </main>
+    <!-- Todo Widget -->
+    <div class="widget notes-widget">
+      <div class="widget-header">
+        <span class="widget-title">MISSION TASKS</span>
+        <span class="widget-icon">✅</span>
+      </div>
+      <div id="todo-list" style="min-height:60px; padding:4px 0;">
+        <p id="todo-empty" style="color:#4a6a8a; font-size:12px; padding:8px 12px; margin:0; font-family:'Exo 2',sans-serif;">No tasks yet — ask Jarvis to add one</p>
+      </div>
+      <div style="padding:8px 12px; border-top:1px solid #1a3a5c; display:flex; gap:8px;">
+        <input
+          id="todo-input"
+          type="text"
+          placeholder="Add a task..."
+          style="flex:1; background:#0a1628; border:1px solid #1a3a5c; color:#a0c4e8; padding:6px 10px; font-size:12px; border-radius:4px; font-family:'Exo 2',sans-serif; outline:none;"
+        />
+        <button
+          id="todo-add-btn"
+          style="background:#0a4a7a; border:1px solid #1a8ac8; color:#a0d8ff; padding:6px 14px; font-size:11px; border-radius:4px; cursor:pointer; font-family:'Orbitron',sans-serif; letter-spacing:1px;"
+        >ADD</button>
+      </div>
+    </div>
 
-  <!-- Hidden audio element for TTS playback -->
-  <audio id="tts-audio" style="display: none;"></audio>
+  </main>
+  </div>
+
+  <audio id="tts-audio" style="display:none;"></audio>
 
   <script>
-    // ElevenLabs API Key - Set from build environment or hardcode here
-    window.ELEVENLABS_API_KEY = 'sk_76ac3f55e894123309f89b1ef08e1bd3d42ce3136b8e9828';
+    window.JARVIS_PASSWORD = '1275';
   </script>
   <script src="app.js"></script>
 </body>

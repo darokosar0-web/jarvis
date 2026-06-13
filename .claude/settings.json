@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(\"Ready to restart\")",
+      "PowerShell(\"Server stopped\")",
+      "PowerShell(\"Keypair deleted\")",
+      "PowerShell(\"Ready\")",
+      "Bash(tee /tmp/server.log)",
+      "Read(//tmp/**)",
+      "PowerShell(Get-Process -Name timeout -ErrorAction SilentlyContinue)",
+      "PowerShell(\"Cleaned up\")"
+    ]
+  }
+}

@@ -4,7 +4,7 @@
   "outputDirectory": ".",
   "functions": {
     "api/claude.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/memory.js": {
       "maxDuration": 15

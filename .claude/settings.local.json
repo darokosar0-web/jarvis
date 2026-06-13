@@ -2,7 +2,41 @@
   "permissions": {
     "allow": [
       "PowerShell($gitPath = & { try { git --version 2>$null } catch { $null } }; if \\($gitPath\\) { \"Git is available\" } else { \"Git not found in PATH\" })",
-      "PowerShell(vercel *)"
+      "PowerShell(vercel *)",
+      "Bash(npm list *)",
+      "PowerShell(Start-Sleep -Seconds 2; \\(Invoke-WebRequest -Uri http://127.0.0.1:8000/index.html -UseBasicParsing\\).Content | Select-String 'dashboard|grid' | Select-Object -First 3)",
+      "PowerShell(python3 -c \"import PIL; print\\('PIL available'\\)\" 2>&1)",
+      "PowerShell(pip install Pillow 2>&1)",
+      "PowerShell(python c:\\\\Users\\\\shara\\\\Desktop\\\\generate_thumbnail.py)",
+      "PowerShell(python c:\\\\Users\\\\shara\\\\Desktop\\\\generate_thumbnail.py 2>&1)",
+      "PowerShell(python c:\\\\Users\\\\shara\\\\Desktop\\\\generate_dramatic_thumbnail.py 2>&1)",
+      "PowerShell(pip install playwright 2>&1)",
+      "PowerShell(pip install moviepy 2>&1)",
+      "PowerShell(Get-Item 'c:\\\\Users\\\\shara\\\\Desktop\\\\test-video\\\\jarvis-demo.mp4' | Select-Object FullName, Length, LastWriteTime, @{Name='Size_MB'; Expression={[math]::Round\\($_.Length / 1MB, 2\\)}} | Format-Table -AutoSize)",
+      "PowerShell(pip install requests 2>&1)",
+      "PowerShell(Get-Item 'c:\\\\Users\\\\shara\\\\Desktop\\\\test-video\\\\voiceover2.wav' | Select-Object FullName, Length, LastWriteTime, @{Name='Size_MB'; Expression={[math]::Round\\($_.Length / 1MB, 2\\)}} | Format-Table -AutoSize)",
+      "PowerShell(Start-Process 'https://jarvis-sand-two.vercel.app')",
+      "Bash(vercel --prod)",
+      "PowerShell(pip install youtube-transcript-api 2>&1)",
+      "PowerShell(pip install yt-dlp 2>&1)",
+      "PowerShell(python -m pip install reportlab --quiet)",
+      "PowerShell(Get-Item 'C:\\\\Users\\\\shara\\\\Desktop\\\\etsy-store\\\\adhd-mum-planner.pdf' | Select-Object FullName, @{Name=\"SizeMB\";Expression={[math]::Round\\($_.Length/1MB,2\\)}}, CreationTime)",
+      "PowerShell(Get-Item 'C:\\\\Users\\\\shara\\\\Desktop\\\\etsy-store\\\\adhd-mum-planner.pdf' | Select-Object FullName, @{Name=\"SizeKB\";Expression={[math]::Round\\($_.Length/1KB,1\\)}}, LastWriteTime)",
+      "Bash(find /c/Users/shara/Projects -name \"*.env*\" -type f 2>/dev/null | head -20)",
+      "Read(//c/Users/shara/Projects/**)",
+      "PowerShell(cd 'C:\\\\Users\\\\shara\\\\Projects\\\\jarvis'; node monitor.js; $exitCode = $LASTEXITCODE; Write-Host \"Exit code: $exitCode\")",
+      "PowerShell(Remove-Item 'C:\\\\Users\\\\shara\\\\Desktop\\\\jarvis-monitor.log' -Force -ErrorAction SilentlyContinue; cd 'C:\\\\Users\\\\shara\\\\Projects\\\\jarvis'; node monitor.js; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "PowerShell(cd 'C:\\\\Users\\\\shara\\\\Projects\\\\jarvis'; node monitor.js; Write-Host \"Exit code: $LASTEXITCODE\")",
+      "Bash(cat ~/.pm2/logs/freellmapi-tunnel-error.log | grep trycloudflare | tail -5)",
+      "Read(//c/Users/shara/.pm2/logs/**)",
+      "Bash(find ~ -name \"*freellmapi*\" -o -name \"*tunnel*\" 2>/dev/null | head -10)",
+      "Read(//c/Users/shara/**)",
+      "Bash(xargs grep -l \"tunnel\\\\|cloudflare\")",
+      "PowerShell(\"Server process stopped\")",
+      "Bash(pm2 start *)",
+      "PowerShell(pm2 start \"C:\\\\Users\\\\shara\\\\Desktop\\\\mission-control\\\\server.js\" --name mission-control)",
+      "PowerShell(pm2 save)",
+      "PowerShell(pm2 startup)"
     ]
   }
 }

@@ -1,6 +1,5 @@
 import { Redis } from '@upstash/redis';
-
-const MEMORY_KEY = 'daro-memory';
+import Anthropic from '@anthropic-ai/sdk';
 
 if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
   console.warn('[memory] Upstash Redis environment variables not configured');
@@ -11,41 +10,17 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
 
-function parseRedisValue(value) {
+// Redis keys
+const KEYS = {
+  summary:  'jarvis:summary',   // rolling conversation summary
+  recent:   'jarvis:recent',    // last 4 messages only
+  facts:    'jarvis:facts',     // extracted facts about Daro
+};
+
+function parse(value) {
   if (!value) return null;
   if (typeof value === 'object') return value;
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch {
-      console.warn('[memory] Failed to parse Redis value:', value.substring(0, 100));
-      return null;
-    }
-  }
-  return null;
-}
-
-function extractKeyInfo(messages) {
-  const text = messages.map(m => typeof m.content === 'string' ? m.content : '').join(' ');
-  const info = {
-    mentions: [],
-    numbers: [],
-    keywords: []
-  };
-
-  // Extract numbers and money
-  const numbers = text.match(/£[\d,]+|\d+%|\d+ clients?|\d+ days?/gi) || [];
-  info.numbers = [...new Set(numbers)].slice(0, 10);
-
-  // Extract capitalized names/places
-  const names = text.match(/\b[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\b/g) || [];
-  info.mentions = [...new Set(names)].slice(0, 10);
-
-  // Extract action words
-  const actions = text.match(/\b(need to|going to|will|should|must|plan to|want to)\s+\w+/gi) || [];
-  info.keywords = [...new Set(actions)].slice(0, 5);
-
-  return info;
+  try { return JSON.parse(value); } catch { return null; }
 }
 
 const corsHeaders = {
@@ -55,73 +30,120 @@ const corsHeaders = {
 };
 
 export default async (req, res) => {
-  // Set CORS headers
-  Object.entries(corsHeaders).forEach(([key, value]) => {
-    res.setHeader(key, value);
-  });
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  // GET — load persisted session data
+  // GET — load all memory layers
   if (req.method === 'GET') {
     try {
-      const stored = await redis.get(MEMORY_KEY);
-      console.log('[memory] Redis returned:', stored ? `${typeof stored}` : 'null');
-      const sessionData = parseRedisValue(stored);
-      console.log('[memory] GET ok — data found:', sessionData ? 'YES' : 'NO');
-      res.status(200).json(sessionData || { messages: [], keyInfo: { mentions: [], numbers: [], keywords: [] } });
+      const [summary, recent, facts] = await Promise.all([
+        redis.get(KEYS.summary),
+        redis.get(KEYS.recent),
+        redis.get(KEYS.facts),
+      ]);
+
+      res.status(200).json({
+        summary: parse(summary) || '',
+        recent:  parse(recent)  || [],
+        facts:   parse(facts)   || [],
+      });
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error('[memory] GET failed:', errorMsg);
-      res.status(200).json({ messages: [], keyInfo: { mentions: [], numbers: [], keywords: [] }, _error: errorMsg });
+      console.error('[memory] GET failed:', err.message);
+      res.status(200).json({ summary: '', recent: [], facts: [] });
     }
     return;
   }
 
-  // POST — save conversation and extract key info
+  // POST — save latest messages, summarise if needed
   if (req.method === 'POST') {
     try {
       const { messages } = req.body;
-
       if (!Array.isArray(messages) || messages.length < 2) {
-        console.log('[memory] Skipping — too few messages:', messages?.length);
-        res.status(200).json({ skipped: true });
-        return;
+        res.status(200).json({ skipped: true }); return;
       }
 
-      console.log('[memory] Processing POST with', messages.length, 'messages');
+      // Always keep only last 4 messages in recent
+      const recentMessages = messages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-4);
 
-      const now = new Date().toISOString();
-      const lastTenMessages = messages.slice(-10);
-      const keyInfo = extractKeyInfo(messages);
+      await redis.set(KEYS.recent, JSON.stringify(recentMessages));
 
-      const sessionData = {
-        date: now,
-        messageCount: messages.length,
-        messages: lastTenMessages,
-        keyInfo: keyInfo
-      };
+      // Summarise every 8 messages to keep context flat
+      if (messages.length > 0 && messages.length % 8 === 0) {
+        console.log('[memory] Triggering summarisation at', messages.length, 'messages');
 
-      await redis.set(MEMORY_KEY, JSON.stringify(sessionData));
-      console.log('[memory] Saved conversation data:', messages.length, 'messages');
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      res.status(200).json({ success: true, saved: sessionData });
+        const existingSummary = parse(await redis.get(KEYS.summary)) || '';
+
+        const toSummarise = messages
+          .filter(m => m.role === 'user' || m.role === 'assistant')
+          .slice(-8)
+          .map(m => `${m.role === 'user' ? 'Daro' : 'Jarvis'}: ${typeof m.content === 'string' ? m.content : ''}`)
+          .join('\n');
+
+        const summaryResponse = await client.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: `Summarise this conversation in 3-5 bullet points. Focus on decisions made, things Daro wants to build, problems solved, and any facts about his business. Be concise.
+
+${existingSummary ? `Previous summary:\n${existingSummary}\n\n` : ''}New messages:
+${toSummarise}
+
+Reply with bullet points only. No intro text.`
+          }]
+        });
+
+        const newSummary = summaryResponse.content[0]?.text || '';
+        await redis.set(KEYS.summary, JSON.stringify(newSummary));
+        console.log('[memory] Summary updated');
+      }
+
+      // Extract facts from the last user message
+      const lastUserMsg = messages.filter(m => m.role === 'user').slice(-1)[0];
+      if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+        const existingFacts = parse(await redis.get(KEYS.facts)) || [];
+        const factPatterns = [
+          /my (?:new )?client is ([^.!?]+)/i,
+          /i(?:'ve| have) (?:got|signed|closed) ([^.!?]+)/i,
+          /i(?:'m| am) working on ([^.!?]+)/i,
+          /i want to ([^.!?]+)/i,
+          /i need to ([^.!?]+)/i,
+        ];
+
+        const newFacts = [];
+        for (const pattern of factPatterns) {
+          const match = lastUserMsg.content.match(pattern);
+          if (match) {
+            const fact = match[0].trim();
+            if (!existingFacts.includes(fact)) newFacts.push(fact);
+          }
+        }
+
+        if (newFacts.length > 0) {
+          const updatedFacts = [...existingFacts, ...newFacts].slice(-20);
+          await redis.set(KEYS.facts, JSON.stringify(updatedFacts));
+          console.log('[memory] New facts saved:', newFacts);
+        }
+      }
+
+      res.status(200).json({ success: true });
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error('[memory] POST failed:', errorMsg);
-      res.status(500).json({ error: errorMsg });
+      console.error('[memory] POST failed:', err.message);
+      res.status(500).json({ error: err.message });
     }
     return;
   }
 
- // DELETE — clear all memory
+  // DELETE — clear all memory
   if (req.method === 'DELETE') {
     try {
-      await redis.del(MEMORY_KEY);
-      console.log('[memory] Memory cleared');
+      await Promise.all(Object.values(KEYS).map(k => redis.del(k)));
+      console.log('[memory] All memory cleared');
       res.status(200).json({ success: true, message: 'Memory cleared' });
     } catch (err) {
       res.status(500).json({ error: err.message });

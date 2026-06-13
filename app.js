@@ -1,3 +1,44 @@
+/* ===== LOGIN AUTHENTICATION ===== */
+function initLogin() {
+  const loginContainer = document.getElementById('login-container');
+  const dashboardContainer = document.getElementById('dashboard-container');
+  const loginForm = document.getElementById('login-form');
+  const passwordInput = document.getElementById('password-input');
+  const loginError = document.getElementById('login-error');
+  const correctPassword = window.JARVIS_PASSWORD;
+
+  // Check if already logged in
+  if (sessionStorage.getItem('jarvis-authenticated')) {
+    loginContainer.style.display = 'none';
+    dashboardContainer.style.display = 'flex';
+    return;
+  }
+
+  // Show login page
+  loginContainer.style.display = 'flex';
+  dashboardContainer.style.display = 'none';
+  passwordInput.focus();
+
+  loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const enteredPassword = passwordInput.value.trim();
+
+    if (enteredPassword === correctPassword) {
+      sessionStorage.setItem('jarvis-authenticated', 'true');
+      loginError.style.display = 'none';
+      loginContainer.style.display = 'none';
+      dashboardContainer.style.display = 'flex';
+      passwordInput.value = '';
+      initJarvis();
+    } else {
+      loginError.textContent = 'INCORRECT ACCESS CODE. TRY AGAIN.';
+      loginError.style.display = 'block';
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  });
+}
+
 /* ===== CLOCK ===== */
 function updateClock() {
   const now = new Date();
@@ -93,6 +134,7 @@ notesArea.addEventListener('input', () => {
 
 /* ===== MEMORY ===== */
 let memory = null;
+let todos = [];
 
 async function loadMemory() {
   try {
@@ -112,6 +154,16 @@ async function loadMemory() {
     }
   } catch (err) {
     console.error('[memory] Load error:', err);
+  }
+}
+async function loadTodos() {
+  try {
+    const res = await fetch('/api/todos');
+    const data = await res.json();
+    todos = data.todos || [];
+    console.log('[todos] Loaded:', todos.length, 'items');
+  } catch (err) {
+    console.error('[todos] Load failed:', err);
   }
 }
 
@@ -169,9 +221,52 @@ let isListening = false;
 let currentUtterance = null;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-const ELEVENLABS_VOICE_ID = 'GtSp2hTKSZw927goiuGK';
-const ELEVENLABS_MODEL = 'eleven_turbo_v2';
-const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech/';
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')  // ***text*** → text
+    .replace(/\*\*(.*?)\*\*/g, '$1')      // **text** → text
+    .replace(/__(.*?)__/g, '$1')          // __text__ → text
+    .replace(/\*(.*?)\*/g, '$1')          // *text* → text
+    .replace(/_(.*?)_/g, '$1')            // _text_ → text
+    .replace(/~~(.*?)~~/g, '$1')          // ~~text~~ → text
+    .replace(/```[\s\S]*?```/g, '')       // ```code``` → remove
+    .replace(/`(.*?)`/g, '$1')            // `code` → code
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // [text](url) → text
+    .replace(/^#+\s+/gm, '')              // # Header → Header
+    .replace(/^[\s]*[-*+]\s+/gm, '')      // - item → item
+    .replace(/^[\s]*\d+\.\s+/gm, '')      // 1. item → item
+    .replace(/^>\s+/gm, '')               // > quote → quote
+    .replace(/<[^>]*>/g, '')              // <tag> → remove
+    .replace(/\s+/g, ' ')                 // multiple spaces → single
+    .trim();
+}
+
+function splitIntoChunks(text) {
+  const chunks = [];
+
+  // Split by newlines to create logical lines
+  const lines = text.split(/\n+/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if this is a list item (bullet or numbered)
+    const isListItem = /^[-*+]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed);
+
+    // Split each line into sentences
+    const sentences = trimmed.match(/[^.!?]*[.!?]+/g) || [trimmed];
+
+    for (const sentence of sentences) {
+      const text = sentence.trim();
+      if (text) {
+        chunks.push({ text, isListItem });
+      }
+    }
+  }
+
+  return chunks;
+}
 
 async function speakMessage(text) {
   if (!voiceEnabled || !text) return;
@@ -180,61 +275,73 @@ async function speakMessage(text) {
   updateVoiceIndicator('speaking');
 
   try {
-    const apiKey = window.ELEVENLABS_API_KEY;
-    if (!apiKey || apiKey === '__ELEVENLABS_API_KEY__') {
-      console.warn('ElevenLabs API key not configured.');
-      speakWithBrowser(text);
-      return;
-    }
+    const cleanText = stripMarkdown(text);
+    const chunks = splitIntoChunks(cleanText);
 
-    const url = `${ELEVENLABS_API_URL}${ELEVENLABS_VOICE_ID}`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'xi-api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        text: text.trim(),
-        model_id: ELEVENLABS_MODEL,
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          speed: 0.85,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`ElevenLabs error: ${response.status}`);
-    }
-
-    const audioBuffer = await response.arrayBuffer();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-    const audioUrl = URL.createObjectURL(audioBlob);
+    if (chunks.length === 0) return;
 
     const audio = document.getElementById('tts-audio');
     if (!audio) {
+      console.warn('Audio element not found');
       speakWithBrowser(text);
       return;
     }
 
-    audio.src = audioUrl;
-    audio.onended = () => {
-      updateVoiceIndicator(null);
-      currentUtterance = null;
-      URL.revokeObjectURL(audioUrl);
-    };
-    audio.onerror = () => {
-      updateVoiceIndicator(null);
-      speakWithBrowser(text);
+    const audioQueue = [];
+
+    // Fetch audio for all chunks first
+    for (const chunk of chunks) {
+      const response = await fetch('/api/elevenlabs-tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: chunk.text }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `API error: ${response.status}`);
+      }
+
+      const { audioUrl } = await response.json();
+      audioQueue.push({ audioUrl, isListItem: chunk.isListItem });
+    }
+
+    // Play audio queue sequentially with 400ms gaps
+    let currentIndex = 0;
+    let playbackTimeout = null;
+
+    const scheduleNext = (delayMs = 400) => {
+      if (playbackTimeout) clearTimeout(playbackTimeout);
+      playbackTimeout = setTimeout(playNext, delayMs);
     };
 
-    currentUtterance = { type: 'audio', element: audio };
-    audio.play().catch(() => speakWithBrowser(text));
+    const playNext = () => {
+      if (currentIndex >= audioQueue.length) {
+        updateVoiceIndicator(null);
+        currentUtterance = null;
+        return;
+      }
+
+      const { audioUrl } = audioQueue[currentIndex];
+      currentIndex++;
+
+      audio.src = audioUrl;
+      audio.onended = () => scheduleNext(400);
+      audio.onerror = () => {
+        console.warn('Audio playback error');
+        scheduleNext(400);
+      };
+
+      currentUtterance = { type: 'audio', element: audio };
+      audio.play().catch(() => {
+        console.warn('Audio play failed');
+        scheduleNext(400);
+      });
+    };
+
+    playNext();
   } catch (err) {
-    console.error('ElevenLabs TTS error:', err.message || err);
+    console.error('TTS error:', err.message || err);
     speakWithBrowser(text);
   }
 }
@@ -353,7 +460,74 @@ function appendMessage(role, content) {
 
   return wrap;
 }
+/* ===== TODOS ===== */
+function renderTodos() {
+  const list = document.getElementById('todo-list');
+  const empty = document.getElementById('todo-empty');
+  if (!list) return;
 
+  list.querySelectorAll('.todo-item').forEach(el => el.remove());
+
+  if (todos.length === 0) {
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+
+  todos.forEach(todo => {
+    const item = document.createElement('div');
+    item.className = 'todo-item';
+    item.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid #0d2137;';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = todo.done;
+    checkbox.style.cssText = 'cursor:pointer; accent-color:#1a8ac8;';
+    checkbox.addEventListener('change', async () => {
+      await fetch(`/api/todos?id=${todo.id}`, { method: 'PATCH' });
+      todo.done = !todo.done;
+      renderTodos();
+    });
+
+    const label = document.createElement('span');
+    label.textContent = todo.text;
+    label.style.cssText = `flex:1; font-size:12px; color:${todo.done ? '#4a6a8a' : '#a0c4e8'}; text-decoration:${todo.done ? 'line-through' : 'none'};`;
+
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.style.cssText = 'background:none; border:none; color:#4a6a8a; cursor:pointer; font-size:16px; line-height:1; padding:0;';
+    del.addEventListener('click', async () => {
+      await fetch(`/api/todos?id=${todo.id}`, { method: 'DELETE' });
+      todos = todos.filter(t => t.id !== todo.id);
+      renderTodos();
+    });
+
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    item.appendChild(del);
+    list.appendChild(item);
+  });
+}
+
+document.getElementById('todo-add-btn')?.addEventListener('click', async () => {
+  const input = document.getElementById('todo-input');
+  const text = input?.value.trim();
+  if (!text) return;
+  const res = await fetch('/api/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  todos.push(data.todo);
+  renderTodos();
+  input.value = '';
+});
+
+document.getElementById('todo-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('todo-add-btn')?.click();
+});
 function removeTyping() {
   const el = document.getElementById('typing-indicator');
   if (el) el.remove();
@@ -365,7 +539,7 @@ async function callJarvis(messages, onChunk) {
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, memory }),
+    body: JSON.stringify({ messages, memory, todos }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -391,14 +565,22 @@ async function callJarvis(messages, onChunk) {
     const lines = chunk.split('\n');
 
     for (const line of lines) {
-      if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-        try {
-          const { text } = JSON.parse(line.slice(6));
-          fullText += text;
-          if (onChunk) onChunk(fullText);
-        } catch {}
+  if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+    try {
+      const parsed = JSON.parse(line.slice(6));
+
+      if (parsed.todoAdded) {
+        todos.push(parsed.todoAdded);
+        renderTodos();
+        continue;
       }
-    }
+
+      const { text } = parsed;
+      fullText += text;
+      if (onChunk) onChunk(fullText);
+    } catch {}
+  }
+}
   }
 
   return fullText;
@@ -465,10 +647,21 @@ ttsToggleBtn?.addEventListener('click', () => {
 });
 
 /* ===== INIT ===== */
-(async function initJarvis() {
+function warmupTTS() {
+  fetch('/api/elevenlabs-tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'hello' }),
+  }).catch(() => {});
+}
+
+async function initJarvis() {
   appendMessage('jarvis', '');
 
+  warmupTTS();
+
   await loadMemory();
+  await loadTodos();
 
   const hasMemory = memory && memory.summary;
   const greetContent = hasMemory
@@ -504,4 +697,8 @@ document.getElementById('clear-memory-btn')?.addEventListener('click', async () 
   const badge = document.getElementById('memory-badge');
   if (badge) badge.style.display = 'none';
   alert('Memory cleared.');
-});}());
+});
+}
+
+// Initialize login first, then Jarvis
+document.addEventListener('DOMContentLoaded', initLogin);

@@ -1,3 +1,23 @@
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*\*(.*?)\*\*\*/g, '$1')  // ***text*** → text
+    .replace(/\*\*(.*?)\*\*/g, '$1')      // **text** → text
+    .replace(/__(.*?)__/g, '$1')          // __text__ → text
+    .replace(/\*(.*?)\*/g, '$1')          // *text* → text
+    .replace(/_(.*?)_/g, '$1')            // _text_ → text
+    .replace(/~~(.*?)~~/g, '$1')          // ~~text~~ → text
+    .replace(/```[\s\S]*?```/g, '')       // ```code``` → remove
+    .replace(/`(.*?)`/g, '$1')            // `code` → code
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // [text](url) → text
+    .replace(/^#+\s+/gm, '')              // # Header → Header
+    .replace(/^[\s]*[-*+]\s+/gm, '')      // - item → item
+    .replace(/^[\s]*\d+\.\s+/gm, '')      // 1. item → item
+    .replace(/^>\s+/gm, '')               // > quote → quote
+    .replace(/<[^>]*>/g, '')              // <tag> → remove
+    .replace(/\s+/g, ' ')                 // multiple spaces → single
+    .trim();
+}
+
 export default async (req, res) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -22,7 +42,12 @@ export default async (req, res) => {
   }
 
   try {
-    const { text } = req.body;
+    let { text } = req.body;
+    text = stripMarkdown(text);
+
+    // Trim to first 2 sentences
+    const sentences = text.split('. ');
+    text = sentences.slice(0, 2).join('. ');
 
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       console.error('Invalid text input: empty or not a string');
@@ -35,18 +60,6 @@ export default async (req, res) => {
 
     const apiKey = process.env.ELEVENLABS_API_KEY;
 
-    console.log('=== ElevenLabs TTS Function Debug ===');
-    console.log('Environment variables available:', Object.keys(process.env).length);
-
-    const envKeys = Object.keys(process.env).filter(k => k.includes('ELEVEN') || k.includes('API') || k.includes('KEY'));
-    console.log('Relevant env vars found:', envKeys);
-
-    console.log('ELEVENLABS_API_KEY exists:', !!apiKey);
-    if (apiKey) {
-      console.log('API Key length:', apiKey.length);
-      console.log('API Key starts with:', apiKey.substring(0, 10) + '...');
-    }
-
     if (!apiKey || apiKey.trim().length === 0) {
       console.error('ELEVENLABS_API_KEY is not set or is empty');
       Object.entries(headers).forEach(([key, value]) => {
@@ -54,19 +67,15 @@ export default async (req, res) => {
       });
       res.status(500).json({
         error: 'ElevenLabs API key not configured in environment variables',
-        debug: 'ELEVENLABS_API_KEY environment variable is missing or empty'
       });
       return;
     }
 
-    const voiceId = 'mZ8K1MPRiT5wDQaasg3i';
+    const voiceId = 'jRAAK67SEFE9m7ci5DhD';
     const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
     console.log('Calling ElevenLabs API:', url);
     console.log('Request text length:', text.trim().length);
-    console.log('Using voice ID:', voiceId);
-    console.log('Using model: eleven_turbo_v2');
-    console.log('API Key format check - starts with:', apiKey.substring(0, 5) + '...');
 
     const requestBody = {
       text: text.trim(),
@@ -77,8 +86,6 @@ export default async (req, res) => {
       },
       output_format: 'mp3_22050_32',
     };
-
-    console.log('Request body keys:', Object.keys(requestBody));
 
     const ttsResponse = await fetch(url, {
       method: 'POST',
@@ -91,78 +98,22 @@ export default async (req, res) => {
 
     console.log('ElevenLabs response status:', ttsResponse.status);
     console.log('ElevenLabs response ok:', ttsResponse.ok);
-    console.log('ElevenLabs response content-type:', ttsResponse.headers.get('content-type'));
 
     if (!ttsResponse.ok) {
       let errorBody = '';
-      let errorJson = null;
       try {
         errorBody = await ttsResponse.text();
-        // Try to parse as JSON for better readability
-        try {
-          errorJson = JSON.parse(errorBody);
-        } catch (parseErr) {
-          // Not JSON, will use raw text
-        }
       } catch (e) {
         errorBody = 'Could not read error response';
       }
 
-      console.error('═══════════════════════════════════════');
-      console.error('❌ ElevenLabs API ERROR');
-      console.error('═══════════════════════════════════════');
-      console.error('Status:', ttsResponse.status, ttsResponse.statusText);
-      console.error('URL:', url);
-      console.error('Voice ID:', voiceId);
-      console.error('Model:', 'eleven_turbo_v2');
-      console.error('API Key (starts):', apiKey.substring(0, 5) + '...');
-      console.error('─────────────────────────────────────');
-
-      if (errorJson) {
-        console.error('Error Response (JSON):');
-        console.error(JSON.stringify(errorJson, null, 2));
-      } else {
-        console.error('Error Response (Raw):');
-        console.error(errorBody);
-      }
-      console.error('═══════════════════════════════════════');
-
+      console.error('❌ ElevenLabs API error:', ttsResponse.status, errorBody);
       Object.entries(headers).forEach(([key, value]) => {
         res.setHeader(key, value);
       });
-
-      if (ttsResponse.status === 401) {
-        console.error('❌ Authentication failed - API key is invalid, expired, or incorrect');
-        res.status(500).json({
-          error: 'Invalid ElevenLabs API key',
-          debug: `Got 401 from ElevenLabs - key may be expired or incorrect. Key length: ${apiKey.length}. Check that ELEVENLABS_API_KEY is set correctly in Vercel environment variables.`,
-          fullError: errorJson || errorBody
-        });
-        return;
-      }
-      if (ttsResponse.status === 404) {
-        console.error('❌ Voice ID not found - voice may not exist or be available in your plan');
-        res.status(500).json({
-          error: 'Voice not found',
-          debug: `Got 404 from ElevenLabs - voice ID '${voiceId}' may not exist or be unavailable in your plan. Try using a standard voice like 'Rachel' or 'Adam'.`,
-          fullError: errorJson || errorBody
-        });
-        return;
-      }
-      if (ttsResponse.status === 429) {
-        console.warn('⚠️ Rate limited by ElevenLabs');
-        res.status(429).json({
-          error: 'Rate limit exceeded - try again later',
-          fullError: errorJson || errorBody
-        });
-        return;
-      }
-
-      res.status(502).json({
+      res.status(ttsResponse.status).json({
         error: `ElevenLabs service error: ${ttsResponse.status}`,
-        statusText: ttsResponse.statusText,
-        fullError: errorJson || errorBody,
-        debug: `Check API key validity and voice ID. Status: ${ttsResponse.status} ${ttsResponse.statusText}`
+        details: errorBody
       });
       return;
     }
