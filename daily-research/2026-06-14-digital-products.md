@@ -7,9 +7,9 @@
 Live Etsy listings (GBP shops) for trending products in the "digital products" niche, sorted by relevance.
 
 ## Pricing Insights
-- **Average Price:** £5.24
+- **Average Price:** £5.49
 - **Price Range:** £0.99 - £15.99
-- **GBP listings found:** 10 (of 100 total checked)
+- **GBP listings found:** 9 (of 100 total checked)
 
 ## Top Findings
 
@@ -57,11 +57,6 @@ Live Etsy listings (GBP shops) for trending products in the "digital products" n
 **Price:** £4.99
 **Favourites:** 8
 **Link:** [Visit](https://www.etsy.com/listing/1743775585/instagram-highlight-icons-pastel-pink)
-
-### 10. PLR Fitness Tracker Canva Template | Weight Loss Tracker | Digital Planner | Resell PLR Digital Product | Passive Income Business | Exersize
-**Price:** £2.99
-**Favourites:** 1
-**Link:** [Visit](https://www.etsy.com/listing/1857629508/plr-fitness-tracker-canva-template)
 
 ---
 
