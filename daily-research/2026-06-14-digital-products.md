@@ -7,9 +7,9 @@
 Live Etsy listings (GBP shops) for trending products in the "digital products" niche, sorted by relevance.
 
 ## Pricing Insights
-- **Average Price:** £5.67
+- **Average Price:** £5.24
 - **Price Range:** £0.99 - £15.99
-- **GBP listings found:** 11 (of 100 total checked)
+- **GBP listings found:** 10 (of 100 total checked)
 
 ## Top Findings
 
